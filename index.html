@@ -26,7 +26,7 @@
           <span class="icon-bar"></span>
           <span class="icon-bar"></span>
         </button>
-        <a class="navbar-brand" href="#">Outlook SPA Demo</a>
+        <a class="navbar-brand" href="/">AutoMailer for Afficient Academy (Click here to return to home)</a>
       </div>
       <div id="navbar" class="navbar-collapse collapse">
         <ul class="nav navbar-nav authed-nav">
@@ -57,10 +57,28 @@
 </div>
 
     <!-- error message -->
+    <div id="error-display" class="page panel panel-danger">
+        <div class="panel-heading">
+            <h3 class="panel-title" id="error-name"></h3>
+        </div>
+        <div class="panel-body">
+            <pre><code id="error-desc"></code></pre>
+        </div>
+    </div>
 
     <!-- inbox display -->
 
     <!-- token display -->
+    <div id="token-display" class="page panel panel-default">
+  <div class="panel-body">
+    <h4>Access Token:</h4>
+    <pre><code id="token"></code></pre>
+    <h4>Expires:</h4>
+    <p id="expires-display"></p>
+    <h4>ID Token:</h4>
+    <pre><code id="id-token"></code></pre>
+  </div>
+</div>
 
   </div>
 </body>

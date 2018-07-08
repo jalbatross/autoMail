@@ -4,7 +4,7 @@ $(function() {
   var authEndpoint = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?';
   var redirectUri = 'https://joeyalbano.com/autoMail';
   var appId = '71699bd0-1be1-4919-85e0-cdb4d41b7310';
-  var scopes = 'openid profile User.Read Mail.Read Mail.Send';
+  var scopes = 'openid profile User.Read Mail.Read Mail.Send Mail.ReadWrite';
   
   // Check for browser support for sessionStorage
   if (typeof(Storage) === 'undefined') {
@@ -75,6 +75,27 @@ $(function() {
         } else {
         // Redirect to home page
           window.location.hash = '#';
+        }
+      },
+
+      //Display send screen
+      '#sender': function() {
+        if (isAuthenticated) {
+          renderSender();
+        }
+        else {
+          alert('error: needs authentication before sending');
+          window.location.hash='#';
+        }
+      },
+
+      //Send generic e-mail
+      '#sender-button':function() {
+        if (isAuthenticated) {
+          sendGenericEmail();
+        }
+        else {
+          window.location.hash='#';
         }
       },
 
@@ -154,6 +175,11 @@ $(function() {
         $('#message-list').append(msgList);
       }
     });
+  }
+
+  function renderSender() {
+    setActiveNav('#sender-nav');
+    $('#sender').show();
   }
 
   // OAUTH FUNCTIONS =============================
@@ -348,6 +374,82 @@ function getUserInboxMessages(callback) {
         responseText: 'Could not retrieve access token'
       };
       callback(null, error);
+    }
+  });
+}
+
+//Sends generic email to self
+function sendGenericEmail() {
+  getAccessToken(function(accessToken) {
+    if (accessToken) {
+      var client = MicrosoftGraph.Client.init({
+        authProvider:(done)=> {
+          done(null,accessToken);
+        }
+      });
+
+      let userEmail = "";
+      //Get user e-mail
+      client
+      .api('/me')
+      .select('mail')
+      .get((err, res) => {
+        if (err) {
+          console.log(err);
+        }
+
+        //No error getting user e-mail
+        else {
+          userEmail = res.mail;
+
+          const mail = {
+            subject: "test e-mail",
+            toRecipients: [
+            {
+              emailAddress: {
+                address: userEmail
+              }
+            }/*,
+            {
+              emailAddress: {
+                address: "???@gmail.com"
+              }
+            }*/],
+            body: {
+              content: "test",
+              contentType: "html"
+            },
+            attachments: [
+              {
+                "@odata.type": "#Microsoft.OutlookServices.FileAttachment",
+                "name": "menu.txt",
+                "contentBytes": "bWFjIGFuZCBjaGVlc2UgdG9kYXk="
+              }
+              
+            ]
+          }
+
+          //Second api call for sending mail nested in async get mail call
+          client
+          .api('users/me/sendMail')
+          .post(
+          { message: mail },
+          (err, res) => {
+            if (err) {
+              console.log(err);
+            }
+            else {
+              console.log("Sent an email to: " + userEmail);
+            }
+          });
+          //end second api call
+        }
+
+      });
+    }
+    //If no access token
+    else {
+      alert("couldn't send mail, no access token!!");
     }
   });
 }

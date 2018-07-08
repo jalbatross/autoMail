@@ -32,6 +32,7 @@
         <ul class="nav navbar-nav authed-nav">
           <li id='home-nav'><a href="#">Home</a></li>
           <li id='inbox-nav'><a href="#inbox">Inbox</a></li>
+          <li id='sender-nav'><a href="#sender">Send generic e-mail</a></li>
         </ul>
         <ul class="nav navbar-nav navbar-right authed-nav">
           <li><a href="#signout">Sign out</a></li>
@@ -81,6 +82,15 @@
         </div>
     </div>
 
+    <div id="sender" class="page panel pangel-default">
+        <div class="panel-heading">
+            <h1 class="panel-title">Sender (generic e-mail)</h1>
+        </div>
+        <div id="sender-body" class="panel-body">
+            <a href="#sender-button"><button type="button" class="btn btn-primary">Send generic e-mail to self</button></a>
+        </div>
+    </div>
+
     <!-- token display -->
     <div id="token-display" class="page panel panel-default">
   <div class="panel-body">
@@ -106,5 +116,6 @@
     </div>
     {{/each}}
   </script>
+
 </body>
 </html>

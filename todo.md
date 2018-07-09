@@ -4,7 +4,7 @@
 ~~1. Complete Todo List~~ (Jul 8, 2018)
 
 # Phase 1
-1. Convert PDF to file attachment then send to multiple e-mails
+1. ~~Convert PDF to file attachment then send to multiple e-mails~~ (Jul 8, 2018)
 2. Convert multiple PDFs to file attachments, then send to specific e-mails
 2. Download PDF from another API and convert it to attachment, then send to e-mails
 

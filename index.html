@@ -84,10 +84,33 @@
 
     <div id="sender" class="page panel pangel-default">
         <div class="panel-heading">
-            <h1 class="panel-title">Sender (generic e-mail)</h1>
+            <h1 class="panel-title">Sender (template e-mail)</h1>
         </div>
         <div id="sender-body" class="panel-body">
+            <div id="template-params"> 
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Email Generator</th>
+                    <th scope="col"> </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Student Name</th>
+                    <td>inputBox1</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Student Gender</th>
+                    <td>dropDown1</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <a href="#sender-button"><button type="button" class="btn btn-primary">Send generic e-mail to self</button></a>
+            <a href="#progress-user-list-button"><button type="button" class="btn btn-primary">Get prog report user list</button></a>
+            <a href="#send-progress-report-button"><button type="button" class="btn btn-primary">Send progress reports to users</button></a>
+            <div class="list-group" id="user-list"></div>
         </div>
     </div>
 
@@ -117,5 +140,20 @@
     {{/each}}
   </script>
 
+  <!-- Handlebars template for progress report user list -->
+  <script id="user-list-template" type="text/x-handlebars-template">
+    {{#each user}}
+    <div class="list-group-item">
+      <a class="closeDiv">
+        <button type="button" class="close" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </a>
+      <p id ="{{this}}" class="list-group-item-text user-login">{{this}}</p>
+    </div>
+    {{/each}}
+  </script>
+
 </body>
 </html>
+

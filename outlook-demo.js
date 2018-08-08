@@ -98,6 +98,18 @@ $(function() {
           window.location.hash='#';
         }
       },
+      '#progress-user-list-button':function() {
+        if (isAuthenticated) {
+          renderProgressUserList();
+        }
+        else {
+          window.location.hash='#';
+        }
+      },
+      '#send-progress-report-button':function() {
+        sendProgressReports();
+        window.location.hash='#sender';
+      },
 
       // Shown if browser doesn't support session storage
       '#unsupportedbrowser': function () {
@@ -176,6 +188,31 @@ $(function() {
       }
     });
   }
+
+  function renderProgressUserList() {
+    setActiveNav('#sender-nav');
+    $('#user-list').empty();
+    $('#sender').show();
+    getProgressReportUsers(function(users,error) {
+      if (error) {
+        renderError('Failed to get progress report user list: ', error);
+      }
+      else {
+        var templateSource = $('#user-list-template').html();
+        var template = Handlebars.compile(templateSource);
+
+        var userList = template({user: users});
+        $('#user-list').append(userList);
+
+        //Attach listener to remove users from list
+        $(document).on('click','.closeDiv',function() {
+          $(this).parent().remove();
+        });
+      }
+
+    })
+  }
+
 
   function renderSender() {
     setActiveNav('#sender-nav');
@@ -415,7 +452,7 @@ function sendGenericEmail() {
               emailAddress: {
                 address: "???@gmail.com"
               }
-            }]*/,
+            }*/],
             body: {
               content: "test",
               contentType: "html"
@@ -497,6 +534,61 @@ function sendGenericEmail() {
     sessionStorage.clear();
   }
 
+  async function sendProgressReports() {
+    var userArr = [];
+    setActiveNav('#sender-nav');
+    $('#sender').show();
+
+    //Get list of users from document
+    var elems = $('#user-list').children().find(".user-login");
+    for (let i = 0; i < elems.length; i++) {
+      userArr.push(elems[i].textContent);
+    }
+
+    console.log(userArr);
+
+    var query = "";
+
+    var sendReportParam = 
+        {
+            createdBy: "joey", 
+            createdDate: new Date(),
+            users: []
+        };
+
+    for (let i = 1; i < 8; i++) {
+        sendReportParam.users = [];
+        sendReportParam.users.push(userArr[i]);
+        query = "#" + userArr[i].replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
+
+        // wait for the promise to resolve before advancing the for loop
+        await $.when(
+                //query the API to send progress report
+                $.ajax({
+                url:"https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/sendProgressReportToUsers",
+                type:"POST",
+                data:JSON.stringify(sendReportParam),
+                contentType:"application/json; charset=utf-8",
+                dataType:"json",
+                success: function(response){
+                    console.log(response);
+                    console.log('successfully sent progress report to' + sendReportParam.users);
+                    $(query).addClass("alert alert-success");
+                  }
+                })
+              ).done(function(response1) {
+                console.log('sent prog report success for : ', userArr[i]);
+              })
+              .fail(function(err) {
+                console.log(err);
+                $(query).addClass("alert alert-danger");
+
+              })
+    }
+    console.log('done');
+
+  }
+
   Handlebars.registerHelper("formatDate", function(datetime){
     // Dates from API look like:
     // 2016-06-27T14:06:13Z
@@ -504,4 +596,174 @@ function sendGenericEmail() {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   });
 
+  // ADMINISTRATIVE FUNCTIONS ===============
+  /**
+  * Gets user list for progress reports 
+  * 
+  * @return String[] of usernames 
+  */
+  function getProgressReportUsers(callback) {
+    //get yesterday
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    //4 weeks before yesterday
+    var fourWeeksBeforeYesterday = new Date();
+    fourWeeksBeforeYesterday.setDate(yesterday.getDate() - 28);
+
+    //data for progress report user API query
+    var progressReportUserParams = 
+    {
+      program_id: "1", 
+      start_date: fourWeeksBeforeYesterday, 
+      end_date: yesterday, 
+      user_role:""
+    };
+
+    //data for all user list API query
+    var allUserListParams = 
+    {
+      namePrefix: "",       
+      operator: "joey",             
+      reportDate: new Date(),        
+      userRole: "all",             
+      userHasEmail: 1           
+  
+    }
+
+    var progressReportUsers = [];
+    var allUsers = new Set();
+
+    $.when(
+      //query the API to get list of all users
+      $.ajax({
+          url:"https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/getUsers",
+          type:"POST",
+          data:JSON.stringify(allUserListParams),
+          contentType:"application/json; charset=utf-8",
+          dataType:"json",
+          success: function(response){
+              console.log('all users is: ', response);
+              for (let i = 0; i < response.length; i++) {
+                  if (response[i].role === "student" || response[i].role === "super-student") {
+                      allUsers.add(response[i].userName);
+                  }
+              }
+          }
+        }),
+
+        //query the API using proxy server to bypass CORS and get list of users for progress report
+        $.ajax({
+            url:"https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/getalluseractivities4admin",
+            type:"POST",
+            data:JSON.stringify(progressReportUserParams),
+            contentType:"application/json; charset=utf-8",
+            dataType:"json",
+            success: function(response){
+                console.log('progress report users is: ', response);
+                for (let i = 0; i < response.length; i++) {
+                    //Make sure username at least makes sense 
+                    if (response[i].username.indexOf(".") === -1) {
+                        continue;
+                    }
+                    //otherwise
+                    progressReportUsers.push(response[i].username);
+                }
+            }
+        })
+    ).done(function(response1,response2) {
+        console.log('Both ajax calls done, preparing final arr');
+        //Iterate through progress report users and check if the user is 'student' or 'super-student'
+        //If so, add it to the final array of users which will serve as the list of students
+        //to send progress reports to.
+        var finalArr = [];
+        for (let i = 0; i < progressReportUsers.length; i++) {
+            if(allUsers.has(progressReportUsers[i])) {
+                finalArr.push(progressReportUsers[i]);
+            }
+        }
+
+        console.log('Done, final array is: ', finalArr);
+        callback(finalArr, null);
+        var nextNames = [];
+        var added = 10;
+        var sendReportParam = 
+        {
+            createdBy: "joey", 
+            createdDate: new Date(),
+            users: []
+        };
+
+
+
+        /*
+        for (let i = 0; i < finalArr.length; ) {
+
+            //Add 10 users to send list, otherwise add remaining users
+            if (finalArr.length - i >= 10) {
+                for (let j = 0; j < 10; j++) {
+                    nextNames = finalArr.pop();
+                }
+                i += 10;
+            }
+            else {
+                for (let j = 0; j < finalArr.length - i; j++) {
+                    nextNames = finalArr.pop();
+                }
+                i = finalArr.length;
+            }
+
+            sendReportParam.users = nextNames;
+
+
+            $.ajax({
+                url:"https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/sendProgressReportToUsers",
+                type:"POST",
+                data:JSON.stringify(sendReportParam),
+                contentType:"application/json; charset=utf-8";
+                dataType:"json",
+                async:false,
+                success: function(response){
+                    console.log(response);
+                    console.log('successfully sent progress reports to ' + sendReportParam);
+                }
+            });
+            nextNames = [];
+        }
+        */
+
+    })
+    .fail(function(err) {
+        console.log(err);
+        callback(null, err);
+    })
+
+  }
+
 });
+
+
+
+
+/*
+studentName + "'s" 1 Month Progress 
+
+Hi parentName,  
+
+Hope you're having a goodOrGreat week! I'm thrilledWord to say that Ryan has done workDescription since joining Afficient Academy!  
+
+studentName is a very bright student, studentGender niceObservation1. studentGender criticalObservation1. solution1. criticalObservation2. criticalObservation3. solution2. solution3, encouragement1!  
+
+We are very proud of studentName and we thank you for choosing Afficient Academy!  
+
+Once again, thank you for being a part of Afficient Academy and we look forward to helping studentName continue to grow!
+
+studentName
+studentGender
+parentName
+goodOrGreat = ["good", "great"]
+jobDescription = ["a tremendous job", "such a good job", "such a great job", "an excellent job", "an impressive amount of work", "such great work", "such good work"]
+thrilledWord = ["excited", "thrilled", "delighted"]
+brightWord = ["bright", "able", "sharp", "capable"]
+
+*/

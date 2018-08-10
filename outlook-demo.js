@@ -4,7 +4,14 @@ $(function() {
   var authEndpoint = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?';
   var redirectUri = 'https://joeyalbano.com/autoMail';
   var appId = '71699bd0-1be1-4919-85e0-cdb4d41b7310';
-  var scopes = 'openid profile User.Read Mail.Read Mail.Send Mail.ReadWrite';
+  var scopes = 'openid profile User.Read Mail.Read Mail.Send Mail.ReadWrite Mail.Read.Shared';
+
+  var reportsSentThisWeek = new Set();
+  var reportsSentArr = [];
+  var finishedLast = false;
+
+  const NUM_PROGRESS_REPORTS = 500;
+  const PROGRESS_REPORT_EMAIL = 'progress.report@afficienta.com';
   
   // Check for browser support for sessionStorage
   if (typeof(Storage) === 'undefined') {
@@ -77,40 +84,6 @@ $(function() {
           window.location.hash = '#';
         }
       },
-
-      //Display send screen
-      '#sender': function() {
-        if (isAuthenticated) {
-          renderSender();
-        }
-        else {
-          alert('error: needs authentication before sending');
-          window.location.hash='#';
-        }
-      },
-
-      //Send generic e-mail
-      '#sender-button':function() {
-        if (isAuthenticated) {
-          sendGenericEmail();
-        }
-        else {
-          window.location.hash='#';
-        }
-      },
-      '#progress-user-list-button':function() {
-        if (isAuthenticated) {
-          renderProgressUserList();
-        }
-        else {
-          window.location.hash='#';
-        }
-      },
-      '#send-progress-report-button':function() {
-        sendProgressReports();
-        window.location.hash='#sender';
-      },
-
       // Shown if browser doesn't support session storage
       '#unsupportedbrowser': function () {
         $('#unsupported').show();
@@ -124,6 +97,9 @@ $(function() {
       window.location.hash = '#';
     }
   }
+
+  $('#send-progress-reports-button').click(sendProgressReports);
+  $('#clear-sent-users-button').click(clearSentUsers);
 
   function setActiveNav(navId) {
     $('#navbar').find('li').removeClass('active');
@@ -158,11 +134,129 @@ $(function() {
     $('#error-display', window.parent.document).show();
   }
 
+  /**
+   * Updates the internal Set with names of progress reports sent
+   * by looking at the last NUM_PROGRESS_REPORTS emails of
+   * the progress report user's e-mail.
+   *
+   * Joey Albano Aug 9 2018
+   * 
+   * @return
+   */
+  function getSentProgressReports(callback) {
+    getAccessToken(function(accessToken) {
+    if (accessToken) {
+      // Create a Graph client
+      var client = MicrosoftGraph.Client.init({
+        authProvider: (done) => {
+          // Just return the token
+          done(null, accessToken);
+        }
+      });
+
+      // Check the last NUM_PROGRESS_REPORTS e-mails
+      client
+        .api('/users/' + PROGRESS_REPORT_EMAIL + '/messages')
+        .top(NUM_PROGRESS_REPORTS)
+        .select('subject,from,receivedDateTime')
+        .orderby('receivedDateTime DESC')
+        .get((err, res) => {
+          if (err) {
+            callback(null, err);
+          } else {
+            console.log(res);
+            var thisMonday = new Date();
+            var day = thisMonday.getDay();
+            var diff = thisMonday.getDate() - day  + (day === 0 ? -6: 1);
+            thisMonday.setDate(diff);
+
+            var emailDate = new Date();
+            var lastIndex = 0;
+
+            var studentName = "";
+            var emailSubject = "";
+            const numCharactersToSkip = "Student Progress Report for ".length;
+            //E-mail title is: "Student Progress Report for First.Last 01-01-01"
+
+            //Filter out progress reports to be only from this Monday or later
+            for (let i = 0; i < res.value.length; i++) {
+              emailDate = Date.parse(res.value[i].receivedDateTime);
+
+              if (emailDate < thisMonday) {
+                lastIndex = i;
+                break;
+              }
+
+              //Remove "Student Progress Report for " from the subject title
+              //emailSubject is now: " First.Last 01-01-01"
+              emailSubject = res.value[i].subject.substring(numCharactersToSkip);
+
+              //Find the name in subject
+              studentName = emailSubject.substring(0, emailSubject.lastIndexOf(' '));
+              reportsSentThisWeek.add(studentName);
+              reportsSentArr.push(studentName);
+            }
+
+            //Apply style changes to user list if e-mails took longer to get
+            if (finishedLast === true) {
+              var query =  "";
+
+              for (let name of reportsSentArr) {
+                query = "#" + name.replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
+                $(query).addClass('list-group-item list-group-item-success');
+              }
+
+              $('#num-need-reports').text($('#user-list').children().find(".user-login").length - reportsSentArr.length);
+
+              reportsSentArr = [];
+            } 
+            else {
+              $('#num-progress-reports-sent').text(reportsSentArr.length);
+              finishedLast = true; //Otherwise, we finished first
+            }
+
+            //Send back the messages
+            
+            callback(res.value.slice(0,lastIndex));
+          }
+        });
+    } 
+    else {
+      var error = {
+        responseText: 'Could not retrieve access token'
+      };
+      callback(null, error);
+    }
+  });
+}
+
   function renderWelcome(isAuthed) {
     if (isAuthed) {
+      finishedLast = false;
+
+      $('#sent-reports-status').removeClass().addClass('fa fa-circle-o-notch fa-spin').css('color','black');
+      $('#user-list-status').removeClass().addClass('fa fa-circle-o-notch fa-spin').css('color','black');
+
       $('#username').text(sessionStorage.userDisplayName);
+      $('#userEmail').text(sessionStorage.userSigninName);
+      $('#userEmail').css('color', 'white');
       $('#logged-in-welcome').show();
+
+      getSentProgressReports(function(messages, error) {
+        if (error) {
+          $('#sent-reports-status').removeClass();
+          $('#sent-reports-status').addClass('fa fa-times');
+          $('#sent-reports-status').css('color', 'red');
+        }
+        else {
+          $('#sent-reports-status').removeClass();
+          $('#sent-reports-status').addClass('fa fa-check');
+          $('#sent-reports-status').css('color', 'green');
+        }
+      });
+      renderProgressUserList();
       setActiveNav('#home-nav');
+
     } else {
       $('#connect-button').attr('href', buildAuthUrl());
       $('#signin-prompt').show();
@@ -179,7 +273,7 @@ $(function() {
       if (error) {
         renderError('getUserInboxMessages failed', error);
       } else {
-        $('#inbox-status').text('Here are the 10 most recent messages in your inbox.');
+        $('#inbox-status').text('Here are the last 400 sent from the progress report e-mail.');
         var templateSource = $('#msg-list-template').html();
         var template = Handlebars.compile(templateSource);
 
@@ -190,19 +284,37 @@ $(function() {
   }
 
   function renderProgressUserList() {
-    setActiveNav('#sender-nav');
     $('#user-list').empty();
-    $('#sender').show();
     getProgressReportUsers(function(users,error) {
       if (error) {
+          $('#user-list-status').removeClass().addClass('fa fa-times');
+          $('#user-list-status').css('color', 'red');
         renderError('Failed to get progress report user list: ', error);
       }
       else {
+        $('#user-list-status').removeClass().addClass('fa fa-check');
+        $('#user-list-status').css('color', 'green');
+
         var templateSource = $('#user-list-template').html();
         var template = Handlebars.compile(templateSource);
 
         var userList = template({user: users});
         $('#user-list').append(userList);
+
+        //Apply check if finished last
+        if (finishedLast === true){
+          var query = "";
+          for (let name of reportsSentArr) {
+            query = "#" + name.replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
+            $(query).addClass('list-group-item list-group-item-success');
+          }
+
+          $('#num-need-reports').text($('#user-list').children().find(".user-login").length - reportsSentArr.length);
+          reportsSentArr = [];
+        }
+        else {
+          finishedLast = true;
+        }
 
         //Attach listener to remove users from list
         $(document).on('click','.closeDiv',function() {
@@ -316,6 +428,13 @@ $(function() {
       callback(false);
     }
 
+    //Check domain from the payload
+    var userEmail = payload.preferred_username;
+    var userDomain = userEmail.substring(userEmail.lastIndexOf("@") + 1);
+    if (userDomain !== "afficienta.com") {
+      callback(false);
+    }
+
     // Check the issuer
     // Should be https://login.microsoftonline.com/{tenantid}/v2.0
     if (payload.iss !== 'https://login.microsoftonline.com/' + payload.tid + '/v2.0') {
@@ -331,9 +450,10 @@ $(function() {
       callback(false);
     }
 
+
+
     // Now that we've passed our checks, save the bits of data
     // we need from the token.
-
     sessionStorage.userDisplayName = payload.name;
     sessionStorage.userSigninName = payload.preferred_username;
 
@@ -393,17 +513,49 @@ function getUserInboxMessages(callback) {
         }
       });
 
-      // Get the 10 newest messages
+      // Check the 500 newest messages
       client
-        .api('/me/mailfolders/inbox/messages')
-        .top(10)
+        .api('/users/progress.report@afficienta.com/messages')
+        .top(500)
         .select('subject,from,receivedDateTime,bodyPreview')
         .orderby('receivedDateTime DESC')
         .get((err, res) => {
           if (err) {
             callback(null, err);
           } else {
-            callback(res.value);
+            console.log(res);
+            var thisMonday = new Date();
+            var day = thisMonday.getDay();
+            var diff = thisMonday.getDate() - day  + (day === 0 ? -6: 1);
+            thisMonday.setDate(diff);
+
+            var emailDate = new Date();
+            var lastIndex = 0;
+
+            var studentName = "";
+            var emailSubject = "";
+            const numCharactersToSkip = "Student Progress Report for ".length;
+
+            //Filter emails from the past week
+            for (let i = 0; i < res.value.length; i++) {
+              emailDate = Date.parse(res.value[i].receivedDateTime);
+
+              if (emailDate < thisMonday) {
+                lastIndex = i;
+                break;
+              }
+
+              //Remove "Student Progress Report for " from the subject title
+              emailSubject = res.value[i].subject.substring(numCharactersToSkip);
+
+              //Find the name in subject
+              studentName = emailSubject.substring(0, emailSubject.lastIndexOf(' '));
+              reportsSentThisWeek.add(studentName);
+              var query = "#" + studentName.replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
+              $(query).addClass('list-group-item list-group-item-success');
+            }
+
+            callback(res.value.slice(0,lastIndex));
           }
         });
     } else {
@@ -482,7 +634,6 @@ function sendGenericEmail() {
           });
           //end second api call
         }
-
       });
     }
     //If no access token
@@ -534,32 +685,51 @@ function sendGenericEmail() {
     sessionStorage.clear();
   }
 
+  function clearSentUsers() {
+    //Get list of users from document
+    var elems = $('#user-list').children().find(".user-login");
+
+    for (let i = 0; i < elems.length; i++) {
+      //Remove those which have been sent
+      if ($(elems[i]).parent().hasClass('list-group-item-success')) {
+        $(elems[i]).parent().remove();
+      }
+    }
+  }
+
+  /**
+   * Sends progress reports to selected users synchronously
+   */
   async function sendProgressReports() {
     var userArr = [];
-    setActiveNav('#sender-nav');
-    $('#sender').show();
 
     //Get list of users from document
     var elems = $('#user-list').children().find(".user-login");
+
     for (let i = 0; i < elems.length; i++) {
-      userArr.push(elems[i].textContent);
+      //Check to make sure progress report hasn't been sent yet
+      //Parent div contains styling
+      if (!$(elems[i]).parent().hasClass('list-group-item-success')) {
+        userArr.push(elems[i].textContent);
+      }
     }
 
-    console.log(userArr);
-
+    console.log('Will send reports to: ', userArr);
+    
     var query = "";
 
     var sendReportParam = 
         {
-            createdBy: "joey", 
+            createdBy: "reportBot", 
             createdDate: new Date(),
             users: []
         };
 
-    for (let i = 1; i < 8; i++) {
+    for (let i = 0; i < userArr.length; i++) {
         sendReportParam.users = [];
         sendReportParam.users.push(userArr[i]);
-        query = "#" + userArr[i].replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
+        query = userArr[i].replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
+
 
         // wait for the promise to resolve before advancing the for loop
         await $.when(
@@ -571,20 +741,18 @@ function sendGenericEmail() {
                 contentType:"application/json; charset=utf-8",
                 dataType:"json",
                 success: function(response){
-                    console.log(response);
-                    console.log('successfully sent progress report to' + sendReportParam.users);
-                    $(query).addClass("alert alert-success");
+                    console.log('Successfully sent progress report to: ' + sendReportParam.users[0]);
+                    $(query).removeClass().addClass("list-group-item list-group-item-success");
                   }
                 })
               ).done(function(response1) {
-                console.log('sent prog report success for : ', userArr[i]);
               })
               .fail(function(err) {
-                console.log(err);
-                $(query).addClass("alert alert-danger");
-
+                console.log('Failed to send progress report to: ', userArr[i], ' because of: ',err);
+                $(query).removeClass().addClass("list-group-item list-group-item-danger");
               })
     }
+
     console.log('done');
 
   }
@@ -684,54 +852,8 @@ function sendGenericEmail() {
         }
 
         console.log('Done, final array is: ', finalArr);
+        $('#num-eligible-progress-reports').text(finalArr.length);
         callback(finalArr, null);
-        var nextNames = [];
-        var added = 10;
-        var sendReportParam = 
-        {
-            createdBy: "joey", 
-            createdDate: new Date(),
-            users: []
-        };
-
-
-
-        /*
-        for (let i = 0; i < finalArr.length; ) {
-
-            //Add 10 users to send list, otherwise add remaining users
-            if (finalArr.length - i >= 10) {
-                for (let j = 0; j < 10; j++) {
-                    nextNames = finalArr.pop();
-                }
-                i += 10;
-            }
-            else {
-                for (let j = 0; j < finalArr.length - i; j++) {
-                    nextNames = finalArr.pop();
-                }
-                i = finalArr.length;
-            }
-
-            sendReportParam.users = nextNames;
-
-
-            $.ajax({
-                url:"https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/sendProgressReportToUsers",
-                type:"POST",
-                data:JSON.stringify(sendReportParam),
-                contentType:"application/json; charset=utf-8";
-                dataType:"json",
-                async:false,
-                success: function(response){
-                    console.log(response);
-                    console.log('successfully sent progress reports to ' + sendReportParam);
-                }
-            });
-            nextNames = [];
-        }
-        */
-
     })
     .fail(function(err) {
         console.log(err);

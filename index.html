@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Outlook SPA Demo</title>
+  <title>Afficient AutoMail</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
   <link href="//ajax.aspnetcdn.com/ajax/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" />
   <link href="//ajax.aspnetcdn.com/ajax/bootstrap/3.3.6/css/bootstrap-theme.min.css" rel="stylesheet">
   <link href="style.css" rel="stylesheet" type="text/css" />
@@ -32,9 +33,10 @@
         <ul class="nav navbar-nav authed-nav">
           <li id='home-nav'><a href="#">Home</a></li>
           <li id='inbox-nav'><a href="#inbox">Inbox</a></li>
-          <li id='sender-nav'><a href="#sender">Send generic e-mail</a></li>
+          <li id='sender-nav'><a href="#sender">Sender Tool</a></li>
         </ul>
         <ul class="nav navbar-nav navbar-right authed-nav">
+          <li><span id="userEmail"></span></li>
           <li><a href="#signout">Sign out</a></li>
         </ul>
       </div>
@@ -43,16 +45,25 @@
 
   <div class="container main-container">
     <div id="signin-prompt" class="jumbotron page">
-      <h1>Outlook SPA Demo</h1>
-      <p>This example shows how to get an OAuth token from Azure using the <a href="https://azure.microsoft.com/en-us/documentation/articles/active-directory-v2-protocols-implicit/">implicit grant flow</a> and to use that token to make calls to the Outlook APIs.</p>
+      <h1>Afficient Academy Automailer</h1>
+      <p>Automatically send progress report e-mails.</p>
       <p>
         <a class="btn btn-lg btn-primary" href="#" role="button" id="connect-button">Connect to Outlook</a>
       </p>
     </div>
     <!-- logged in user welcome -->
     <div id="logged-in-welcome" class="jumbotron page">
-        <h1>Outlook SPA Demo</h1>
-        <p>Welcome <span id="username"></span>! Please use the nav menu to access your Outlook data.</p>
+        <h1>Afficient Academy AutoMail</h1>
+        <p>Welcome <span id="username"></span>! Please use the nav menu to access your Outlook data or send progress reports</p>
+        <span>Getting sent progress reports. . .</span><i id="sent-reports-status" class="fa fa-circle-o-notch fa-spin" style="font-size:16px"></i><br>
+        <span>Getting list of users needing reports. . .</span><i id="user-list-status" class="fa fa-circle-o-notch fa-spin" style="font-size:16px;"></i><br>
+        <span>There have been <span id="num-progress-reports-sent"></span> progress reports sent this week.</span><br>
+        <span><span id="num-eligible-progress-reports"></span> users are eligible for progress reports.</span><br>
+        <span><span id="num-need-reports"></span> users need to be sent reports.</span><br>
+        <button id="send-progress-reports-button" type="button" class="btn btn-primary">Send progress reports to users</button>
+        <button id="clear-sent-users-button" type="button" class="btn btn-primary">Clear sent users</button></a>
+        
+        <div class="list-group" id="user-list"></div>
     </div>
 
     <!-- unsupported browser message -->
@@ -81,52 +92,19 @@
         <div class="list-group" id="message-list">
         </div>
     </div>
-
-    <div id="sender" class="page panel pangel-default">
-        <div class="panel-heading">
-            <h1 class="panel-title">Sender (template e-mail)</h1>
-        </div>
-        <div id="sender-body" class="panel-body">
-            <div id="template-params"> 
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th scope="col">Email Generator</th>
-                    <th scope="col"> </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th scope="row">Student Name</th>
-                    <td>inputBox1</td>
-                  </tr>
-                  <tr>
-                    <th scope="row">Student Gender</th>
-                    <td>dropDown1</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <a href="#sender-button"><button type="button" class="btn btn-primary">Send generic e-mail to self</button></a>
-            <a href="#progress-user-list-button"><button type="button" class="btn btn-primary">Get prog report user list</button></a>
-            <a href="#send-progress-report-button"><button type="button" class="btn btn-primary">Send progress reports to users</button></a>
-            <div class="list-group" id="user-list"></div>
-        </div>
-    </div>
-
-    <!-- token display -->
-    <div id="token-display" class="page panel panel-default">
-  <div class="panel-body">
-    <h4>Access Token:</h4>
-    <pre><code id="token"></code></pre>
-    <h4>Expires:</h4>
-    <p id="expires-display"></p>
-    <h4>ID Token:</h4>
-    <pre><code id="id-token"></code></pre>
+    <!-- token display
+  <div id="token-display" class="page panel panel-default">
+      <div class="panel-body">
+          <h4>Access Token:</h4>
+          <pre><code id="token"></code></pre>
+          <h4>Expires:</h4>
+          <p id="expires-display"></p>
+          <h4>ID Token:</h4>
+          <pre><code id="id-token"></code></pre>
+      </div>
   </div>
+   -->
 </div>
-
-  </div>
 
   <!-- Handlebars template for message list -->
   <script id="msg-list-template" type="text/x-handlebars-template">
@@ -143,13 +121,13 @@
   <!-- Handlebars template for progress report user list -->
   <script id="user-list-template" type="text/x-handlebars-template">
     {{#each user}}
-    <div class="list-group-item">
+    <div id ="{{this}}" class="list-group-item">
       <a class="closeDiv">
         <button type="button" class="close" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
       </a>
-      <p id ="{{this}}" class="list-group-item-text user-login">{{this}}</p>
+      <p class="list-group-item-text user-login">{{this}}</p>
     </div>
     {{/each}}
   </script>

@@ -728,7 +728,7 @@ function sendGenericEmail() {
     for (let i = 0; i < userArr.length; i++) {
         sendReportParam.users = [];
         sendReportParam.users.push(userArr[i]);
-        query = userArr[i].replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
+        query = '#' + userArr[i].replace( /(:|\.|\[|\]|,|=|@)/g, "\\$1");
 
 
         // wait for the promise to resolve before advancing the for loop
@@ -743,6 +743,7 @@ function sendGenericEmail() {
                 success: function(response){
                     console.log('Successfully sent progress report to: ' + sendReportParam.users[0]);
                     $(query).removeClass().addClass("list-group-item list-group-item-success");
+                    $('#num-need-reports').text(($('#num-need-reports').text() - 1));
                   }
                 })
               ).done(function(response1) {
@@ -766,7 +767,11 @@ function sendGenericEmail() {
 
   // ADMINISTRATIVE FUNCTIONS ===============
   /**
-  * Gets user list for progress reports 
+  * Gets list of users who are eligible for progress reports 
+  *
+  * Current criteria:
+  * - User has been active between yesterday and four weeks before yesterday
+  * - User is "student" or "super-student"
   * 
   * @return String[] of usernames 
   */
@@ -779,7 +784,7 @@ function sendGenericEmail() {
     var fourWeeksBeforeYesterday = new Date();
     fourWeeksBeforeYesterday.setDate(yesterday.getDate() - 28);
 
-    //data for progress report user API query
+    //data for progress report user API query (gets users with activity in specific range)
     var progressReportUserParams = 
     {
       program_id: "1", 
@@ -788,7 +793,7 @@ function sendGenericEmail() {
       user_role:""
     };
 
-    //data for all user list API query
+    //data for all user list API query (gets all possible users)
     var allUserListParams = 
     {
       namePrefix: "",       
@@ -796,14 +801,21 @@ function sendGenericEmail() {
       reportDate: new Date(),        
       userRole: "all",             
       userHasEmail: 1           
-  
+    }
+
+    var expirationUserListParams = 
+    {
+      role: "option4admin",
+      learning_center_ids: [-1, 1001, 1002, 1003, 1004, 1005, 1006, 1009, 1010, 1011, 1007, 1008, 1, 3, 4, 5, 6, 7, 2],
+      name_prefix: undefined
     }
 
     var progressReportUsers = [];
+    var expirationUserList = new Set();
     var allUsers = new Set();
 
     $.when(
-      //query the API to get list of all users
+      //Query the API to get list of all users, then filter out students or super-students
       $.ajax({
           url:"https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/getUsers",
           type:"POST",
@@ -820,7 +832,8 @@ function sendGenericEmail() {
           }
         }),
 
-        //query the API using proxy server to bypass CORS and get list of users for progress report
+        //Query the API to get list of users who can be sent progress reports with activity
+        //ranging from four weeks before yesterday -> yesterday
         $.ajax({
             url:"https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/getalluseractivities4admin",
             type:"POST",
@@ -838,9 +851,37 @@ function sendGenericEmail() {
                     progressReportUsers.push(response[i].username);
                 }
             }
+        }),
+
+        //API Query to get user list with expiration dates
+        $.ajax({
+            url: "https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/getUserListForAssignmentAdmin",
+            type: "POST",
+            data: JSON.stringify(expirationUserListParams),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function(response) {
+                console.log('got expiration users: ', response);
+                var userExpirationDate = new Date();
+                response.forEach(function(user) {
+                  userExpirationDate = new Date(user.expiration_date);
+                  //Add students and super-students with expiration date yesterday, but no earlier
+                  //Also check for period in username
+                  if (userExpirationDate >= yesterday 
+                      && (user.role === "student" || user.role === "super-student")
+                      && user.username.indexOf('.') > -1) {
+                    expirationUserList.add(user);
+                  }
+                });
+                console.log('finished expiration date filtering, now have: ', expirationUserList);
+            },
+            error: function(err) {
+              console.log('failed to receive expiration users because: ', err);
+            }
         })
-    ).done(function(response1,response2) {
-        console.log('Both ajax calls done, preparing final arr');
+
+    ).done(function(response1,response2, response3) {
+        console.log('All ajax calls done, preparing final arr');
         //Iterate through progress report users and check if the user is 'student' or 'super-student'
         //If so, add it to the final array of users which will serve as the list of students
         //to send progress reports to.

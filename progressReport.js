@@ -596,3 +596,130 @@ $.ajax({
         console.log(response);
       }
     })
+
+/**
+ * HTTP Post Request to get users during some activity range
+ * @param params = 
+    {
+      program_id: String               leave as "1" 
+      start_date: Date                 A Date object before end_date, usually 4 weeks before yesterday
+      end_date: Date                   A Date object after start_date, usually yesterday
+      user_role: String                Leave as ""
+    };
+ *
+ * @return Array of objects: 
+ * {
+ *     current_grade: String          Student's current grade in Afficient
+ *     fullname: String               Student's first and last name, "John Doe"
+ *     grade_activity_list: Array(Object)
+ *     school_grade: String           Student's current grade in school
+ *     user_id: String                uuid
+ *     username: String               Usually "Firstname.Lastname" except for test accounts and other special situations
+ * }
+ *
+ * grade_activity_list Object
+ * {
+ *     at_learning_center: boolean     
+ *     current_grade: Number
+ *     grade_id: String
+ *     school_grade: String
+ *     score: Number
+ *     score_change: String          Formatted like "(+/-)Number" OR "(No Change"), for example "-0.27" or "+1.23" or "(No Change)"
+ *     used_time: Number
+ * }
+ */
+$.ajax({
+    url: "https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/getalluseractivities4admin",
+    type: "POST",
+    data: JSON.stringify(params),
+    contentType: "application/json; charset=utf-8",
+    dataType: "json",
+    success: function(response) {
+        console.log(response);
+    }
+})
+
+/**
+ * HTTP Post Request to get usernames filtered by expiration date
+ * @param params = 
+ * {
+ *     role: String                             Keep as "option4admin" to get all students. 
+ *                                              Other options are "tutor" (advisor), "lcadmin" (learning center admin), 
+ *                                              "student", "suler-student", "trial", "admin"
+ *     learning_center_ids: Number[19]          Keep as -1, 1001, 1002, 1003, 1004, 1005, 1006, 1009, 1010, 1011, 1007, 1008, 1, 3, 4, 5, 6, 7, 2
+ *     name_prefix: String                      A single lowercase character. Gets all users with role whose first or last name character begins with name_prefix.
+ *                                              Can also be undefined for no filtering of users
+ * }
+ *
+ * @return Array of objects:
+ * {
+ *     $$hashKey: String
+ *     current_grade: String
+ *     expiration_date: String            Can be converted to Date Object, formatted like: "2018-02-09T23:59:59:59"
+ *     firstname: String
+ *     honors: String                     "", "H", or "HH" depending on none, honors, or high honors
+ *     lastname: String
+ *     need_assignment: boolean
+ *     points: String or Number           String if "N/A", Number otherwise
+ *     role: String                       "student", "super-student","admin", "trial", "admin", "tutor", "lcadmin"
+ *     school_grade: String               Corresponds to a number, usually something like "5" or "9"
+ *     username: String                   Valid usernames are "Firstname.Lastname", but some invalid usernames also have this format.
+ *     weekly_time: Number                Assumedly minutes student has spent working over the past week
+ *     _id: String                        24 char uuid
+ *     
+ * }
+ */
+$.ajax({
+    url: "https://joeyalbano.com:8080/https://math.afficienta.com/mathjoy/api/v1.0/getUserListForAssignmentAdmin",
+    type: "POST",
+    data: JSON.stringify(params),
+    contentType: "application/json; charset=utf-8",
+    dataType: "json",
+    success: function(response) {
+        console.log(response);
+    }
+})
+
+{"role":"option4admin","learning_center_ids":[-1,1001,1002,1003,1004,1005,1006,1009,1010,1011,1007,1008,1,3,4,5,6,7,2]}
+
+
+:
+$$hashKey
+:
+"uiGrid-0CJE"
+current_grade
+:
+"2"
+expiration_date
+:
+"2018-02-09T23:59:59"
+firstname
+:
+"Dummy"
+honors
+:
+""
+lastname
+:
+"Account"
+need_assignment
+:
+false
+points
+:
+"N/A"
+role
+:
+"student"
+school_grade
+:
+"4"
+username
+:
+"Dummy.Account1234"
+weekly_time
+:
+180
+_id
+:
+"5a554bc77cdec4354835c605"
